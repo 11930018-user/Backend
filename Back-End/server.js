@@ -4,7 +4,7 @@ const cors = require("cors");
 const path = require("path");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -12,12 +12,13 @@ app.use(express.json());
 // ===== STATIC FILES (IMAGES) =====
 app.use("/img", express.static(path.join(__dirname, "img")));
 
-// ===== DB CONNECTION =====
+// ===== DB CONNECTION (Railway) =====
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "pos_db",
+  host: process.env.MYSQLHOST || "mysql.railway.internal",
+  user: process.env.MYSQLUSER || "root",
+  password: process.env.MYSQLPASSWORD || "",
+  database: process.env.MYSQLDATABASE || "railway",
+  port: process.env.MYSQLPORT || 3306,
 });
 
 db.connect((err) => {
@@ -25,7 +26,7 @@ db.connect((err) => {
     console.error("Database connection failed:", err.message);
     return;
   }
-  console.log("Connected to MySQL (pos_db) database");
+  console.log("Connected to Railway MySQL database");
 });
 
 app.get("/", (req, res) => {
@@ -242,7 +243,6 @@ app.delete("/api/restaurant_tables/:id", (req, res) => {
 // ========== DINE-IN ORDERS & ORDER ITEMS ==========
 const TAX_RATE = 0.0525;
 
-// GET all dine-in orders
 app.get("/api/orders", (req, res) => {
   const query = `
     SELECT o.id,
@@ -266,7 +266,6 @@ app.get("/api/orders", (req, res) => {
   });
 });
 
-// create dine-in order AND mark table reserved
 app.post("/api/orders", (req, res) => {
   const { table_id, employee_id, items } = req.body;
 
@@ -363,7 +362,6 @@ app.post("/api/orders", (req, res) => {
   });
 });
 
-// get items for one dine-in order
 app.get("/api/orders/:id/items", (req, res) => {
   const orderId = req.params.id;
   const query = `
@@ -379,7 +377,6 @@ app.get("/api/orders/:id/items", (req, res) => {
   });
 });
 
-// update order status AND free table if done
 app.put("/api/orders/:id", (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -433,7 +430,6 @@ app.put("/api/orders/:id", (req, res) => {
   });
 });
 
-// delete order AND free its table
 app.delete("/api/orders/:id", (req, res) => {
   const { id } = req.params;
 
@@ -531,7 +527,6 @@ app.get("/api/online_orders", (req, res) => {
   });
 });
 
-// CREATE online order
 app.post("/api/online_orders", (req, res) => {
   const { first_name, last_name, phone, location, items, delivery_type } =
     req.body;
@@ -641,7 +636,6 @@ app.post("/api/online_orders", (req, res) => {
   });
 });
 
-// GET all online order items (optional)
 app.get("/api/online_order_items", (req, res) => {
   const query = `
     SELECT oi.id,
@@ -660,7 +654,6 @@ app.get("/api/online_order_items", (req, res) => {
   });
 });
 
-// GET items for one online order
 app.get("/api/online_orders/:id/items", (req, res) => {
   const onlineOrderId = req.params.id;
 
@@ -683,7 +676,6 @@ app.get("/api/online_orders/:id/items", (req, res) => {
   });
 });
 
-// UPDATE items for one online order + recompute totals
 app.put("/api/online_orders/:id/items", (req, res) => {
   const onlineOrderId = req.params.id;
   const { items } = req.body;
@@ -778,7 +770,6 @@ app.put("/api/online_orders/:id/items", (req, res) => {
   });
 });
 
-// DELETE one online order + its items
 app.delete("/api/online_orders/:id", (req, res) => {
   const { id } = req.params;
 
@@ -805,9 +796,7 @@ app.delete("/api/online_orders/:id", (req, res) => {
         }
 
         if (result.affectedRows === 0) {
-          return db.rollback(() =>
-            res.status(404).json({ message: "Online order not found" })
-          );
+          return res.status(404).json({ message: "Online order not found" });
         }
 
         db.commit((errCommit) => {
@@ -824,7 +813,6 @@ app.delete("/api/online_orders/:id", (req, res) => {
   });
 });
 
-// update online order status / payment
 app.put("/api/online_orders/:id", (req, res) => {
   const { id } = req.params;
   const { status, payment_status } = req.body;
